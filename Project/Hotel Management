@@ -1,0 +1,279 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <fstream>
+using namespace std;
+
+class Room {
+    int roomNumber;
+    string type;
+    double price;
+    bool isAvailable;
+
+public:
+    Room(int num, string t, double p, bool a = true)
+        : roomNumber(num), type(t), price(p), isAvailable(a) {}
+
+    int getRoomNumber() { return roomNumber; }
+    string getType() { return type; }
+    double getPrice() { return price; }
+    bool getAvailability() { return isAvailable; }
+
+    void bookRoom() { isAvailable = false; }
+    void releaseRoom() { isAvailable = true; }
+
+    void displayRoom() {
+        cout << "Room No: " << roomNumber
+             << " | Type: " << type
+             << " | Price: " << price
+             << " | Available: " << (isAvailable ? "Yes" : "No") << endl;
+    }
+
+    // Save to file
+    string toFile() {
+        return to_string(roomNumber) + "," + type + "," +
+               to_string(price) + "," + to_string(isAvailable);
+    }
+};
+
+class Guest {
+    string name;
+    int id;
+
+public:
+    Guest(string n, int i) : name(n), id(i) {}
+
+    string getName() { return name; }
+    int getId() { return id; }
+
+    void displayGuest() {
+        cout << "Guest ID: " << id << " | Name: " << name << endl;
+    }
+
+    string toFile() {
+        return to_string(id) + "," + name;
+    }
+};
+
+class Reservation {
+    int roomNumber;
+    int guestId;
+    string checkInDate;
+    string checkOutDate;
+    double totalBill;
+
+public:
+    Reservation(int r, int g, string in, string out, double bill)
+        : roomNumber(r), guestId(g), checkInDate(in),
+          checkOutDate(out), totalBill(bill) {}
+
+    void displayReservation() {
+        cout << "Room No: " << roomNumber
+             << " | Guest ID: " << guestId
+             << " | Check-in: " << checkInDate
+             << " | Check-out: " << checkOutDate
+             << " | Bill: " << totalBill << endl;
+    }
+
+    int getRoomNumber() { return roomNumber; }
+
+    string toFile() {
+        return to_string(roomNumber) + "," + to_string(guestId) + "," +
+               checkInDate + "," + checkOutDate + "," + to_string(totalBill);
+    }
+};
+
+class Hotel {
+    vector<Room> rooms;
+    vector<Guest> guests;
+    vector<Reservation> reservations;
+
+public:
+    Hotel() {
+        loadRooms();
+        loadGuests();
+        loadReservations();
+
+        if (rooms.empty()) {
+            rooms.push_back(Room(101, "Single", 2000));
+            rooms.push_back(Room(102, "Double", 3500));
+            rooms.push_back(Room(103, "Suite", 6000));
+            saveRooms();
+        }
+    }
+
+    // ========== FILE HANDLING FUNCTIONS ==========
+
+    void saveRooms() {
+        ofstream fout("rooms.txt");
+        for (auto &r : rooms)
+            fout << r.toFile() << endl;
+        fout.close();
+    }
+
+    void saveGuests() {
+        ofstream fout("guests.txt");
+        for (auto &g : guests)
+            fout << g.toFile() << endl;
+        fout.close();
+    }
+
+    void saveReservations() {
+        ofstream fout("reservations.txt");
+        for (auto &res : reservations)
+            fout << res.toFile() << endl;
+        fout.close();
+    }
+
+    void loadRooms() {
+        ifstream fin("rooms.txt");
+        string line;
+        while (getline(fin, line)) {
+            int room;
+            string type;
+            double price;
+            int avail;
+
+            sscanf(line.c_str(), "%d,%[^,],%lf,%d", &room, 
+                   &type[0], &price, &avail);
+
+            rooms.push_back(Room(room, type, price, avail));
+        }
+        fin.close();
+    }
+
+    void loadGuests() {
+        ifstream fin("guests.txt");
+        string line;
+        while (getline(fin, line)) {
+            int id;
+            string name;
+            size_t pos = line.find(",");
+            id = stoi(line.substr(0, pos));
+            name = line.substr(pos + 1);
+            guests.push_back(Guest(name, id));
+        }
+        fin.close();
+    }
+
+    void loadReservations() {
+        ifstream fin("reservations.txt");
+        string line;
+        while (getline(fin, line)) {
+            int r, g;
+            string in, out;
+            double bill;
+
+            sscanf(line.c_str(), "%d,%d,%[^,],%[^,],%lf",
+                   &r, &g, &in[0], &out[0], &bill);
+
+            reservations.push_back(Reservation(r, g, in, out, bill));
+        }
+        fin.close();
+    }
+
+    // ========== MAIN FUNCTIONS ==========
+
+    void showRooms() {
+        cout << "\nAvailable Rooms:\n";
+        for (auto &r : rooms)
+            r.displayRoom();
+    }
+
+    void addGuest() {
+        string name;
+        int id;
+        cout << "\nEnter Guest ID: ";
+        cin >> id;
+        cin.ignore();
+        cout << "Enter Guest Name: ";
+        getline(cin, name);
+
+        guests.push_back(Guest(name, id));
+        saveGuests();
+
+        cout << "Guest added successfully!\n";
+    }
+
+    void bookRoom() {
+        int id, roomNo;
+        string in, out;
+        cout << "\nEnter Guest ID: ";
+        cin >> id;
+        cout << "Enter Room Number to book: ";
+        cin >> roomNo;
+
+        for (auto &r : rooms) {
+            if (r.getRoomNumber() == roomNo && r.getAvailability()) {
+                cout << "Enter Check-in Date (DD/MM/YYYY): ";
+                cin >> in;
+                cout << "Enter Check-out Date (DD/MM/YYYY): ";
+                cin >> out;
+
+                double total = r.getPrice();
+                reservations.push_back(Reservation(roomNo, id, in, out, total));
+                r.bookRoom();
+
+                saveRooms();
+                saveReservations();
+
+                cout << "Room booked successfully!\n";
+                return;
+            }
+        }
+        cout << "Room not available!\n";
+    }
+
+    void checkOut() {
+        int roomNo;
+        cout << "\nEnter Room Number to check out: ";
+        cin >> roomNo;
+
+        for (auto &r : rooms) {
+            if (r.getRoomNumber() == roomNo && !r.getAvailability()) {
+                r.releaseRoom();
+                saveRooms();
+                cout << "Room checked out successfully!\n";
+                return;
+            }
+        }
+        cout << "Invalid room number.\n";
+    }
+
+    void showReservations() {
+        cout << "\n--- Current Reservations ---\n";
+        for (auto &res : reservations)
+            res.displayReservation();
+    }
+};
+
+int main() {
+    Hotel h;
+    int choice;
+
+    do {
+        cout << "\n==== HOTEL MANAGEMENT SYSTEM ====\n";
+        cout << "1. Show Rooms\n";
+        cout << "2. Add Guest\n";
+        cout << "3. Book Room\n";
+        cout << "4. Check Out\n";
+        cout << "5. Show Reservations\n";
+        cout << "0. Exit\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1: h.showRooms(); break;
+            case 2: h.addGuest(); break;
+            case 3: h.bookRoom(); break;
+            case 4: h.checkOut(); break;
+            case 5: h.showReservations(); break;
+            case 0: cout << "Exiting...\n"; break;
+            default: cout << "Invalid choice!\n";
+        }
+    } while (choice != 0);
+
+    return 0;
+}
+
+
